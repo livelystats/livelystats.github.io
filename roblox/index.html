@@ -1,128 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Roblox Streamer Stats</title>
+  <title>Roblox Username Lookup</title>
   <style>
-    :root {
-      --accent-color: #ff4b2b;
-    }
-    body {
-      margin: 0;
-      padding: 2em;
-      font-family: 'Segoe UI', sans-serif;
-      background: #1f1c2c;
-      color: #fff;
-      text-align: center;
-      transition: background 0.3s, color 0.3s;
-    }
-    input, button {
-      padding: 0.6em 1em;
-      margin: 0.5em;
-      font-size: 1em;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    img {
-      margin-top: 1em;
-      border: 4px solid #fff;
-      border-radius: 50%;
-      width: 120px;
-      height: 120px;
-    }
-    #stats p {
-      margin: 0.5em 0;
-      color: var(--accent-color);
-      font-size: 1.1em;
-    }
-    .theme-controls {
-      margin-top: 2em;
-    }
+    body { font-family: sans-serif; background: #121212; color: #fff; text-align: center; padding: 50px; }
+    input, button { padding: 10px; font-size: 16px; margin: 5px; }
+    .output { margin-top: 20px; font-weight: bold; }
   </style>
 </head>
 <body>
-
-  <h1>🎮 Roblox Stats Viewer</h1>
-
-  <input id="username" type="text" placeholder="Enter Roblox username" />
-  <button onclick="startFetching()">Show Stats</button>
-
-  <div id="stats"></div>
-
-  <div class="theme-controls">
-    <h3>Customize Your Theme</h3>
-    BG: <input type="color" id="bgColor" value="#1f1c2c" />
-    Text: <input type="color" id="textColor" value="#ffffff" />
-    Accent: <input type="color" id="accentColor" value="#ff4b2b" />
-    <button onclick="applyTheme()">Apply Theme</button>
-  </div>
+  <h1>Roblox Username Lookup</h1>
+  <input type="text" id="username" placeholder="Enter Roblox username">
+  <button onclick="lookup()">Lookup</button>
+  <div class="output" id="output"></div>
 
   <script>
-    let intervalId = null;
+    async function lookup() {
+      const username = document.getElementById("username").value.trim();
+      if (!username) return alert("Enter a username.");
+      
+      const res = await fetch("https://rapid-cloud-5384.canvas-9bc.workers.dev//users/v1/usernames/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usernames: [username] })
+      });
 
-    async function fetchStats(username) {
-      try {
-        // 1. Get User ID
-        const userRes = await fetch('https://users.roblox.com/v1/usernames/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usernames: [username], excludeBannedUsers: true })
-        });
-        const userData = await userRes.json();
-        if (!userData.data || userData.data.length === 0) {
-          return document.getElementById('stats').innerHTML = '<p style="color:red;">User not found</p>';
-        }
-        const user = userData.data[0];
-        const userId = user.id;
-        const displayName = user.displayName;
-
-        // 2. Get Avatar Thumbnail
-        const thumbRes = await fetch(
-          `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}` +
-          `&size=150x150&format=Png&isCircular=true`
-        );
-        const thumbJson = await thumbRes.json();
-        const avatarUrl = thumbJson.data[0]?.imageUrl || '';
-
-        // 3. Get Counts in Parallel
-        const [followersRes, followingRes, friendsRes] = await Promise.all([
-          fetch(`https://friends.roblox.com/v1/users/${userId}/followers/count`),
-          fetch(`https://friends.roblox.com/v1/users/${userId}/followings/count`),
-          fetch(`https://friends.roblox.com/v1/users/${userId}/friends/count`)
-        ]);
-        const followers = (await followersRes.json()).count;
-        const following = (await followingRes.json()).count;
-        const friends = (await friendsRes.json()).count;
-
-        // 4. Render
-        document.getElementById('stats').innerHTML = `
-          <h2>@${displayName}</h2>
-          <img src="${avatarUrl}" alt="Avatar" />
-          <p>Followers: ${followers}</p>
-          <p>Following: ${following}</p>
-          <p>Friends: ${friends}</p>
-        `;
-      } catch (err) {
-        console.error(err);
-        document.getElementById('stats').innerHTML =
-          '<p style="color:red;">An error occurred while fetching data.</p>';
+      const data = await res.json();
+      if (data?.data?.length && data.data[0]?.id) {
+        document.getElementById("output").innerText = `User ID: ${data.data[0].id}`;
+      } else {
+        document.getElementById("output").innerText = "User not found.";
       }
-    }
-
-    function startFetching() {
-      const username = document.getElementById('username').value.trim();
-      if (!username) return;
-      clearInterval(intervalId);
-      fetchStats(username);
-      intervalId = setInterval(() => fetchStats(username), 5000);
-    }
-
-    function applyTheme() {
-      document.body.style.background = document.getElementById('bgColor').value;
-      document.body.style.color = document.getElementById('textColor').value;
-      document.documentElement.style
-              .setProperty('--accent-color', document.getElementById('accentColor').value);
     }
   </script>
 </body>
