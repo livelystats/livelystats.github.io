@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Roblox Streamer Stats</title>
+  <style>
+    :root {
+      --accent-color: #ff4b2b;
+    }
+
+    body {
+      background: linear-gradient(to bottom right, #1f1c2c, #928dab);
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 2em;
+      transition: all 0.3s ease;
+    }
+
+    input, button, select {
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    .color-inputs {
+      margin-top: 30px;
+    }
+
+    img {
+      border-radius: 50%;
+      margin-top: 20px;
+      border: 4px solid white;
+      width: 120px;
+      height: 120px;
+    }
+
+    #stats p {
+      font-size: 1.2em;
+      color: var(--accent-color);
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎮 Roblox Stats Viewer</h1>
+
+  <input id="username" type="text" placeholder="Enter Roblox username">
+  <button onclick="startFetching()">Show Stats</button>
+
+  <div class="color-inputs">
+    <p>🎨 Customize Your Theme:</p>
+    Background: <input type="color" id="bgColor">
+    Text: <input type="color" id="textColor">
+    Accent: <input type="color" id="accentColor">
+    <button onclick="applyTheme()">Apply Theme</button>
+  </div>
+
+  <div id="stats"></div>
+
+  <script>
+    let intervalId = null;
+
+    async function fetchStats(username) {
+      const userInfoRes = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`);
+      const userInfo = await userInfoRes.json();
+
+      if (!userInfo || userInfo.success === false || userInfo.errorMessage) {
+        document.getElementById('stats').innerHTML = `<p style="color:red;">User not found</p>`;
+        return;
+      }
+
+      const userId = userInfo.Id;
+
+      const [thumbnailRes, followersRes, followingRes, friendsRes] = await Promise.all([
+        fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=150x150&format=Png&isCircular=true`),
+        fetch(`https://friends.roblox.com/v1/users/${userId}/followers/count`),
+        fetch(`https://friends.roblox.com/v1/users/${userId}/followings/count`),
+        fetch(`https://friends.roblox.com/v1/users/${userId}/friends/count`)
+      ]);
+
+      const thumbnailData = await thumbnailRes.json();
+      const avatarUrl = thumbnailData.data[0]?.imageUrl || '';
+
+      const followers = (await followersRes.json())?.count || 0;
+      const following = (await followingRes.json())?.count || 0;
+      const friends = (await friendsRes.json())?.count || 0;
+
+      document.getElementById('stats').innerHTML = `
+        <h2>@${userInfo.Username}</h2>
+        <img src="${avatarUrl}" alt="Avatar" />
+        <p>Followers: ${followers}</p>
+        <p>Following: ${following}</p>
+        <p>Friends: ${friends}</p>
+      `;
+    }
+
+    function startFetching() {
+      const username = document.getElementById('username').value.trim();
+      if (!username) return;
+
+      clearInterval(intervalId);
+      fetchStats(username);
+      intervalId = setInterval(() => {
+        fetchStats(username);
+      }, 5000);
+    }
+
+    function applyTheme() {
+      const bg = document.getElementById('bgColor').value;
+      const text = document.getElementById('textColor').value;
+      const accent = document.getElementById('accentColor').value;
+
+      document.body.style.background = bg;
+      document.body.style.color = text;
+      document.documentElement.style.setProperty('--accent-color', accent);
+    }
+  </script>
+</body>
+</html>
