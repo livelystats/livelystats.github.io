@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Roblox Streamer Stats</title>
   <style>
     :root {
@@ -17,7 +17,7 @@
       transition: all 0.3s ease;
     }
 
-    input, button, select {
+    input, button {
       padding: 10px;
       font-size: 16px;
       margin: 10px;
@@ -47,14 +47,14 @@
 <body>
   <h1>🎮 Roblox Stats Viewer</h1>
 
-  <input id="username" type="text" placeholder="Enter Roblox username">
+  <input id="username" type="text" placeholder="Enter Roblox username" />
   <button onclick="startFetching()">Show Stats</button>
 
   <div class="color-inputs">
     <p>🎨 Customize Your Theme:</p>
-    Background: <input type="color" id="bgColor">
-    Text: <input type="color" id="textColor">
-    Accent: <input type="color" id="accentColor">
+    Background: <input type="color" id="bgColor" />
+    Text: <input type="color" id="textColor" />
+    Accent: <input type="color" id="accentColor" />
     <button onclick="applyTheme()">Apply Theme</button>
   </div>
 
@@ -64,37 +64,45 @@
     let intervalId = null;
 
     async function fetchStats(username) {
-      const userInfoRes = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`);
-      const userInfo = await userInfoRes.json();
+      try {
+        // Get user ID
+        const userRes = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`);
+        const userData = await userRes.json();
 
-      if (!userInfo || userInfo.success === false || userInfo.errorMessage) {
-        document.getElementById('stats').innerHTML = `<p style="color:red;">User not found</p>`;
-        return;
+        if (!userData || userData.success === false || userData.errorMessage) {
+          document.getElementById('stats').innerHTML = `<p style="color:red;">User not found</p>`;
+          return;
+        }
+
+        const userId = userData.Id;
+
+        // Get avatar thumbnail
+        const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
+        const thumbData = await thumbRes.json();
+        const avatarUrl = thumbData.data[0]?.imageUrl || '';
+
+        // Get followers, following, and friends counts
+        const [followersRes, followingRes, friendsRes] = await Promise.all([
+          fetch(`https://friends.roblox.com/v1/users/${userId}/followers/count`),
+          fetch(`https://friends.roblox.com/v1/users/${userId}/followings/count`),
+          fetch(`https://friends.roblox.com/v1/users/${userId}/friends/count`)
+        ]);
+
+        const followers = (await followersRes.json())?.count || 0;
+        const following = (await followingRes.json())?.count || 0;
+        const friends = (await friendsRes.json())?.count || 0;
+
+        document.getElementById('stats').innerHTML = `
+          <h2>@${userData.Username}</h2>
+          <img src="${avatarUrl}" alt="Avatar" />
+          <p>Followers: ${followers}</p>
+          <p>Following: ${following}</p>
+          <p>Friends: ${friends}</p>
+        `;
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        document.getElementById('stats').innerHTML = `<p style="color:red;">An error occurred while fetching data.</p>`;
       }
-
-      const userId = userInfo.Id;
-
-      const [thumbnailRes, followersRes, followingRes, friendsRes] = await Promise.all([
-        fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=150x150&format=Png&isCircular=true`),
-        fetch(`https://friends.roblox.com/v1/users/${userId}/followers/count`),
-        fetch(`https://friends.roblox.com/v1/users/${userId}/followings/count`),
-        fetch(`https://friends.roblox.com/v1/users/${userId}/friends/count`)
-      ]);
-
-      const thumbnailData = await thumbnailRes.json();
-      const avatarUrl = thumbnailData.data[0]?.imageUrl || '';
-
-      const followers = (await followersRes.json())?.count || 0;
-      const following = (await followingRes.json())?.count || 0;
-      const friends = (await friendsRes.json())?.count || 0;
-
-      document.getElementById('stats').innerHTML = `
-        <h2>@${userInfo.Username}</h2>
-        <img src="${avatarUrl}" alt="Avatar" />
-        <p>Followers: ${followers}</p>
-        <p>Following: ${following}</p>
-        <p>Friends: ${friends}</p>
-      `;
     }
 
     function startFetching() {
