@@ -7,123 +7,122 @@
     :root {
       --accent-color: #ff4b2b;
     }
-
     body {
-      background: linear-gradient(to bottom right, #1f1c2c, #928dab);
-      color: white;
-      font-family: 'Segoe UI', sans-serif;
-      text-align: center;
+      margin: 0;
       padding: 2em;
-      transition: all 0.3s ease;
+      font-family: 'Segoe UI', sans-serif;
+      background: #1f1c2c;
+      color: #fff;
+      text-align: center;
+      transition: background 0.3s, color 0.3s;
     }
-
     input, button {
-      padding: 10px;
-      font-size: 16px;
-      margin: 10px;
-      border-radius: 8px;
+      padding: 0.6em 1em;
+      margin: 0.5em;
+      font-size: 1em;
       border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
-
-    .color-inputs {
-      margin-top: 30px;
-    }
-
     img {
+      margin-top: 1em;
+      border: 4px solid #fff;
       border-radius: 50%;
-      margin-top: 20px;
-      border: 4px solid white;
       width: 120px;
       height: 120px;
     }
-
     #stats p {
-      font-size: 1.2em;
+      margin: 0.5em 0;
       color: var(--accent-color);
-      margin: 6px 0;
+      font-size: 1.1em;
+    }
+    .theme-controls {
+      margin-top: 2em;
     }
   </style>
 </head>
 <body>
+
   <h1>🎮 Roblox Stats Viewer</h1>
 
   <input id="username" type="text" placeholder="Enter Roblox username" />
   <button onclick="startFetching()">Show Stats</button>
 
-  <div class="color-inputs">
-    <p>🎨 Customize Your Theme:</p>
-    Background: <input type="color" id="bgColor" />
-    Text: <input type="color" id="textColor" />
-    Accent: <input type="color" id="accentColor" />
+  <div id="stats"></div>
+
+  <div class="theme-controls">
+    <h3>Customize Your Theme</h3>
+    BG: <input type="color" id="bgColor" value="#1f1c2c" />
+    Text: <input type="color" id="textColor" value="#ffffff" />
+    Accent: <input type="color" id="accentColor" value="#ff4b2b" />
     <button onclick="applyTheme()">Apply Theme</button>
   </div>
-
-  <div id="stats"></div>
 
   <script>
     let intervalId = null;
 
     async function fetchStats(username) {
       try {
-        // Get user ID
-        const userRes = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`);
+        // 1. Get User ID
+        const userRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usernames: [username], excludeBannedUsers: true })
+        });
         const userData = await userRes.json();
-
-        if (!userData || userData.success === false || userData.errorMessage) {
-          document.getElementById('stats').innerHTML = `<p style="color:red;">User not found</p>`;
-          return;
+        if (!userData.data || userData.data.length === 0) {
+          return document.getElementById('stats').innerHTML = '<p style="color:red;">User not found</p>';
         }
+        const user = userData.data[0];
+        const userId = user.id;
+        const displayName = user.displayName;
 
-        const userId = userData.Id;
+        // 2. Get Avatar Thumbnail
+        const thumbRes = await fetch(
+          `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}` +
+          `&size=150x150&format=Png&isCircular=true`
+        );
+        const thumbJson = await thumbRes.json();
+        const avatarUrl = thumbJson.data[0]?.imageUrl || '';
 
-        // Get avatar thumbnail
-        const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
-        const thumbData = await thumbRes.json();
-        const avatarUrl = thumbData.data[0]?.imageUrl || '';
-
-        // Get followers, following, and friends counts
+        // 3. Get Counts in Parallel
         const [followersRes, followingRes, friendsRes] = await Promise.all([
           fetch(`https://friends.roblox.com/v1/users/${userId}/followers/count`),
           fetch(`https://friends.roblox.com/v1/users/${userId}/followings/count`),
           fetch(`https://friends.roblox.com/v1/users/${userId}/friends/count`)
         ]);
+        const followers = (await followersRes.json()).count;
+        const following = (await followingRes.json()).count;
+        const friends = (await friendsRes.json()).count;
 
-        const followers = (await followersRes.json())?.count || 0;
-        const following = (await followingRes.json())?.count || 0;
-        const friends = (await friendsRes.json())?.count || 0;
-
+        // 4. Render
         document.getElementById('stats').innerHTML = `
-          <h2>@${userData.Username}</h2>
+          <h2>@${displayName}</h2>
           <img src="${avatarUrl}" alt="Avatar" />
           <p>Followers: ${followers}</p>
           <p>Following: ${following}</p>
           <p>Friends: ${friends}</p>
         `;
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        document.getElementById('stats').innerHTML = `<p style="color:red;">An error occurred while fetching data.</p>`;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('stats').innerHTML =
+          '<p style="color:red;">An error occurred while fetching data.</p>';
       }
     }
 
     function startFetching() {
       const username = document.getElementById('username').value.trim();
       if (!username) return;
-
       clearInterval(intervalId);
       fetchStats(username);
-      intervalId = setInterval(() => {
-        fetchStats(username);
-      }, 5000);
+      intervalId = setInterval(() => fetchStats(username), 5000);
     }
 
     function applyTheme() {
-      const bg = document.getElementById('bgColor').value;
-      const text = document.getElementById('textColor').value;
-      const accent = document.getElementById('accentColor').value;
-
-      document.body.style.background = bg;
-      document.body.style.color = text;
-      document.documentElement.style.setProperty('--accent-color', accent);
+      document.body.style.background = document.getElementById('bgColor').value;
+      document.body.style.color = document.getElementById('textColor').value;
+      document.documentElement.style
+              .setProperty('--accent-color', document.getElementById('accentColor').value);
     }
   </script>
 </body>
